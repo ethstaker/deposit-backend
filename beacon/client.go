@@ -281,7 +281,12 @@ func (c *Client) LookupValidator(ctx context.Context, pubkey phase0.BLSPubKey) (
 	if len(validator.Data) == 0 {
 		return nil, nil
 	}
-	return validator.Data[0], nil
+	for _, v := range validator.Data {
+		if bytes.Equal(v.Validator.PublicKey[:], pubkey[:]) {
+			return v, nil
+		}
+	}
+	return nil, fmt.Errorf("validator not found in response")
 }
 
 func (c *Client) Validators(ctx context.Context, executionAddress common.Address) (ValidatorSummaries, error) {
