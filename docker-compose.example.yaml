@@ -1,6 +1,6 @@
 services:
   deposit-backend:
-    name: deposit-backend
+    container_name: deposit-backend
     build: .
     restart: "unless-stopped"
     ports:

@@ -261,9 +261,18 @@ func (c *Client) Stop() {
 
 // Simply pass-through for the regular validator query.
 func (c *Client) LookupValidator(ctx context.Context, pubkey Pubkey) (*apiv1.Validator, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(12 * time.Second)
+	}
+	commonOpts := api.CommonOpts{
+		Timeout: time.Until(deadline),
+	}
 	httpClient := c.beacon.(*http.Service)
 	validator, err := httpClient.Validators(ctx, &api.ValidatorsOpts{
 		PubKeys: []phase0.BLSPubKey{phase0.BLSPubKey(pubkey)},
+		State:   "head",
+		Common:  commonOpts,
 	})
 	if err != nil {
 		return nil, err
