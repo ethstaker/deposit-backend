@@ -1,0 +1,12 @@
+services:
+  deposit-backend:
+    name: deposit-backend
+    build: .
+    restart: "unless-stopped"
+    ports:
+      - "8080:8080"
+    command:
+      - -beacon-url
+      - http://localhost:5052
+      - -log-level
+      - debug

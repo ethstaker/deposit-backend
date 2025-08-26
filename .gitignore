@@ -1,0 +1,6 @@
+*.swp
+docker-compose.yml
+venv/
+deposit-backend
+cover.out
+

@@ -1,0 +1,129 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "ETH Staker Deposit Backend API",
+        "description": "API for requesting Ethereum validator information by withdrawal credential.",
+        "version": "0.0.1"
+    },
+    "paths": {
+        "/api/v1/validators/{execution_address}": {
+            "get": {
+                "summary": "Get validators by execution address",
+                "description": "Retrieve all validators associated with a specific execution address as its 0x01 or 0x02 credential",
+                "parameters": [
+                    {
+                        "name": "execution_address",
+                        "in": "path",
+                        "required": true,
+                        "description": "The execution address to search for validators",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "example": "0x0011223344556677889900112233445566778899"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved validators",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ValidatorInfo"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid execution address format"
+                    },
+                    "404": {
+                        "description": "No validators found for the given execution address"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            }
+        },
+        "/api/v1/validator/{public_key}": {
+            "get": {
+                "summary": "Get validator by public key",
+                "description": "Retrieve a validator by its public key",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "description": "The public key of the validator",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{96}$",
+                            "example": "0x001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900112233445566778899"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved validator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidatorInfo"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid public key format"
+                    },
+                    "404": {
+                        "description": "No validator found for the given public key"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ValidatorInfo": {
+                "type": "object",
+                "required": [
+                    "validator"
+                ],
+                "properties": {
+                    "validator": {
+                        "$ref": "https://raw.githubusercontent.com/ethereum/beacon-APIs/master/types/api.yaml#/components/schemas/ValidatorResponse"
+                    },
+                    "pending_consolidations": {
+                        "type": "array",
+                        "description": "Pending consolidations from or to the validator",
+                        "items": {
+                            "$ref": "https://raw.githubusercontent.com/ethereum/beacon-APIs/master/types/electra/consolidation.yaml#/components/schemas/Electra/PendingConsolidation"
+                        }
+                    },
+                    "pending_deposits": {
+                        "type": "array",
+                        "description": "Pending deposits to the validator",
+                        "items": {
+                            "$ref": "https://raw.githubusercontent.com/ethereum/beacon-APIs/master/types/electra/deposit.yaml#/components/schemas/Electra/PendingDeposit"
+                        }
+                    },
+                    "pending_partial_withdrawals": {
+                        "type": "array",
+                        "description": "Pending partial withdrawals from the validator",
+                        "items": {
+                            "$ref": "https://raw.githubusercontent.com/ethereum/beacon-APIs/master/types/electra/withdrawal.yaml#/components/schemas/Electra/PendingPartialWithdrawal"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
