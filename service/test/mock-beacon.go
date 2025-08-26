@@ -7,11 +7,12 @@ import (
 	"github.com/EthStaker/deposit-backend/beacon"
 	apiv1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/electra"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
 )
 
 type MockBeacon struct {
-	MockValidators            map[beacon.Pubkey]*apiv1.Validator
+	MockValidators            map[phase0.BLSPubKey]*apiv1.Validator
 	PendingConsolidations     []*electra.PendingConsolidation
 	PendingDeposits           []*electra.PendingDeposit
 	PendingPartialWithdrawals []*electra.PendingPartialWithdrawal
@@ -19,7 +20,7 @@ type MockBeacon struct {
 
 var _ beacon.BeaconProvider = (*MockBeacon)(nil)
 
-func (m *MockBeacon) LookupValidator(ctx context.Context, pubkey beacon.Pubkey) (*apiv1.Validator, error) {
+func (m *MockBeacon) LookupValidator(ctx context.Context, pubkey phase0.BLSPubKey) (*apiv1.Validator, error) {
 	validator, ok := m.MockValidators[pubkey]
 	if !ok {
 		return nil, nil

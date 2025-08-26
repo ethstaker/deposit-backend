@@ -11,6 +11,7 @@ import (
 
 	"github.com/EthStaker/deposit-backend/beacon"
 	apiv1 "github.com/attestantio/go-eth2-client/api/v1"
+	"github.com/attestantio/go-eth2-client/spec/phase0"
 )
 
 const ByPubkeyPattern = "GET /api/v1/validator/{public_key}"
@@ -54,7 +55,7 @@ func (h *ValidatorHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	pubkeyString = pubkeyString[2:]
 
-	var pubkey beacon.Pubkey
+	var pubkey phase0.BLSPubKey
 	pubkeyLength, err := hex.Decode(pubkey[:], []byte(pubkeyString))
 	if err != nil {
 		h.logger.Debug("received request with invalid public key", "public_key", pubkeyString, "error", err)

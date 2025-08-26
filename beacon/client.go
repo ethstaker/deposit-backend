@@ -260,7 +260,8 @@ func (c *Client) Stop() {
 }
 
 // Simply pass-through for the regular validator query.
-func (c *Client) LookupValidator(ctx context.Context, pubkey Pubkey) (*apiv1.Validator, error) {
+func (c *Client) LookupValidator(ctx context.Context, pubkey phase0.BLSPubKey) (*apiv1.Validator, error) {
+
 	deadline, ok := ctx.Deadline()
 	if !ok {
 		deadline = time.Now().Add(12 * time.Second)
@@ -270,7 +271,7 @@ func (c *Client) LookupValidator(ctx context.Context, pubkey Pubkey) (*apiv1.Val
 	}
 	httpClient := c.beacon.(*http.Service)
 	validator, err := httpClient.Validators(ctx, &api.ValidatorsOpts{
-		PubKeys: []phase0.BLSPubKey{phase0.BLSPubKey(pubkey)},
+		PubKeys: []phase0.BLSPubKey{pubkey},
 		State:   "head",
 		Common:  commonOpts,
 	})

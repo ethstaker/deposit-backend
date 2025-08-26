@@ -65,8 +65,8 @@ func init() {
 	}
 	copy(withdrawalCreds2[12:], validExecutionAddressBytes2)
 	testMockBeacon = &test.MockBeacon{
-		MockValidators: map[beacon.Pubkey]*apiv1.Validator{
-			beacon.Pubkey(pubkey): {
+		MockValidators: map[phase0.BLSPubKey]*apiv1.Validator{
+			phase0.BLSPubKey(pubkey): {
 				Index:   1,
 				Balance: 1000000000000000000,
 				Status:  apiv1.ValidatorStateActiveOngoing,
@@ -75,7 +75,7 @@ func init() {
 					WithdrawalCredentials: withdrawalCreds[:],
 				},
 			},
-			beacon.Pubkey(pubkey2): {
+			phase0.BLSPubKey(pubkey2): {
 				Index:   2,
 				Balance: 1000000000000000000,
 				Status:  apiv1.ValidatorStateActiveOngoing,
@@ -84,7 +84,7 @@ func init() {
 					WithdrawalCredentials: withdrawalCreds[:],
 				},
 			},
-			beacon.Pubkey(pubkey3): {
+			phase0.BLSPubKey(pubkey3): {
 				Index:   3,
 				Balance: 1000000000000000000,
 				Status:  apiv1.ValidatorStateActiveOngoing,
