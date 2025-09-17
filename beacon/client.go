@@ -59,6 +59,7 @@ func slogToZerologLevel(level slog.Level) zerolog.Level {
 func NewClient(ctx context.Context, logger *slog.Logger, level slog.Level, beaconUrl string) (*Client, error) {
 	out := new(Client)
 
+	logger.Debug("connecting to beacon node", "url", beaconUrl)
 	ctx, cancel := context.WithCancel(ctx)
 	client, err := http.New(ctx,
 		http.WithAddress(beaconUrl),
