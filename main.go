@@ -14,6 +14,7 @@ import (
 
 var (
 	port      = flag.Int("port", 8080, "The port to listen on")
+	host      = flag.String("host", "127.0.0.1", "The host to listen on")
 	beaconUrl beaconUrlValue
 	logLevel  logLevelValue
 	logFormat logFormatValue
@@ -45,6 +46,7 @@ func main() {
 	svc := service.Service{
 		Logger:  logger,
 		Context: ctx,
+		Host:    *host,
 		Port:    *port,
 		Beacon:  beaconClient,
 	}

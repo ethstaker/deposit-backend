@@ -17,6 +17,7 @@ type Service struct {
 	Context  context.Context
 	Logger   *slog.Logger
 	Port     int
+	Host     string
 	Listener net.Listener
 	Beacon   beacon.BeaconProvider
 }
@@ -27,7 +28,7 @@ func (s *Service) Run() error {
 	s.Logger.Info("Starting service", "port", s.Port)
 
 	if s.Listener == nil {
-		s.Listener, err = net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
+		s.Listener, err = net.Listen("tcp", fmt.Sprintf("%s:%d", s.Host, s.Port))
 		if err != nil {
 			return err
 		}
