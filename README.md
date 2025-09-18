@@ -5,6 +5,7 @@ This project serves as a backend for a to-be-created launchpad alternative.
 It simply provides the frontend with beacon chain data and withdrawal_address->validator mappings.
 
 # Usage
+```
 Usage of ./deposit-backend:
   -beacon-url value
     	The beacon URL to use
@@ -16,6 +17,7 @@ Usage of ./deposit-backend:
     	The log level to use
   -port int
     	The port to listen on (default 8080)
+```
 
 # License
 [AGPLv3](./LICENSE)
