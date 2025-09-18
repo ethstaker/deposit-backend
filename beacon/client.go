@@ -37,6 +37,8 @@ type Client struct {
 
 	updateMutex sync.Mutex
 	cache       atomic.Pointer[cacheRecord]
+
+	refreshInterval uint64
 }
 
 var _ BeaconProvider = (*Client)(nil)
@@ -56,8 +58,9 @@ func slogToZerologLevel(level slog.Level) zerolog.Level {
 	}
 }
 
-func NewClient(ctx context.Context, logger *slog.Logger, level slog.Level, beaconUrl string) (*Client, error) {
+func NewClient(ctx context.Context, logger *slog.Logger, level slog.Level, beaconUrl string, refreshInterval uint64) (*Client, error) {
 	out := new(Client)
+	out.refreshInterval = refreshInterval
 
 	logger.Debug("connecting to beacon node", "url", beaconUrl)
 	ctx, cancel := context.WithCancel(ctx)
@@ -253,6 +256,9 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 
 func (c *Client) handleHeadEvent(ctx context.Context, head *apiv1.HeadEvent) {
 	c.logger.Debug("head event", "slot", head.Slot)
+	if c.refreshInterval > 0 && uint64(head.Slot)%c.refreshInterval != 0 {
+		return
+	}
 	c.updateCache(ctx, head.Slot)
 }
 

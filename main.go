@@ -13,11 +13,12 @@ import (
 )
 
 var (
-	port      = flag.Int("port", 8080, "The port to listen on")
-	host      = flag.String("host", "127.0.0.1", "The host to listen on")
-	beaconUrl beaconUrlValue
-	logLevel  logLevelValue
-	logFormat logFormatValue
+	port            = flag.Int("port", 8080, "The port to listen on")
+	host            = flag.String("host", "127.0.0.1", "The host to listen on")
+	refreshInterval = flag.Uint64("refreshInterval", 4, "How many slots to wait between refreshes of the index")
+	beaconUrl       beaconUrlValue
+	logLevel        logLevelValue
+	logFormat       logFormatValue
 )
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 	defer cancel()
 
 	// Create the beacon client
-	beaconClient, err := beacon.NewClient(ctx, logger, logLevel.Level, beaconUrl.String())
+	beaconClient, err := beacon.NewClient(ctx, logger, logLevel.Level, beaconUrl.String(), *refreshInterval)
 	if err != nil {
 		logger.Error("Failed to create beacon client", "error", err)
 		os.Exit(1)
