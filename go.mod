@@ -3,7 +3,7 @@ module github.com/EthStaker/deposit-backend
 go 1.25.0
 
 require (
-	github.com/attestantio/go-eth2-client v0.26.0
+	github.com/attestantio/go-eth2-client v0.27.1
 	github.com/ethereum/go-ethereum v1.16.2
 	github.com/rs/zerolog v1.32.0
 	golang.org/x/sync v0.12.0
