@@ -156,6 +156,7 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 	pendingConsolidations := make(map[phase0.ValidatorIndex][]*electra.PendingConsolidation, 64)
 	pendingDeposits := make(map[phase0.BLSPubKey][]*electra.PendingDeposit, 64)
 	pendingPartialWithdrawals := make(map[phase0.ValidatorIndex][]*electra.PendingPartialWithdrawal, 64)
+	var pendingDepositsList []*electra.PendingDeposit
 
 	group, wgCtx := errgroup.WithContext(ctx)
 	group.Go(func() error {
@@ -197,6 +198,7 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 			}
 			return fmt.Errorf("failed to get pending deposits: %w", err)
 		}
+		pendingDepositsList = pendingDepositsResponse.Data
 		for _, deposit := range pendingDepositsResponse.Data {
 			pendingDeposits[deposit.Pubkey] = append(pendingDeposits[deposit.Pubkey], deposit)
 		}
@@ -248,10 +250,50 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 		cache.summaries[withdrawalAddress] = append(cache.summaries[withdrawalAddress], summary)
 	}
 
+	// We aren't done yet- we want to check if any pending deposits are for validators
+	// that don't exist in the state yet.
+	addMissingValidatorDeposits(pendingDepositsList, cache)
 	c.cache.Store(cache)
 	c.logger.Debug("updated cache", "duration", time.Since(start))
 
 	return nil
+}
+
+// addMissingValidatorDeposits processes pending deposits for validators that don't exist in the state yet.
+// It groups deposits by pubkey and adds them to the cache. The first deposit for each pubkey sets the
+// withdrawal credentials, and subsequent deposits for the same pubkey are added to the PendingDeposits list.
+func addMissingValidatorDeposits(pendingDepositsList []*electra.PendingDeposit, cache *cacheRecord) {
+	// First, make a map from pubkey to ValidatorSummary. The first deposit for each pubkey creates the ValidatorSummary,
+	// which sets the WithdrawalCredentials.
+	// Subsequent deposits for the same pubkey add to the PendingDeposits list.
+	depositsMissingFromState := make(map[phase0.BLSPubKey]ValidatorSummary)
+	for _, deposit := range pendingDepositsList {
+		withdrawalAddress := common.BytesToAddress(deposit.WithdrawalCredentials[12:])
+		if _, ok := cache.summaries[withdrawalAddress]; !ok {
+			summary, exists := depositsMissingFromState[deposit.Pubkey]
+			if exists {
+				summary.PendingDeposits = append(summary.PendingDeposits, deposit)
+				depositsMissingFromState[deposit.Pubkey] = summary
+			} else {
+				// Create a new summary for this pubkey.
+				depositsMissingFromState[deposit.Pubkey] = ValidatorSummary{
+					Validator: &apiv1.Validator{
+						Validator: &phase0.Validator{
+							PublicKey:             deposit.Pubkey,
+							WithdrawalCredentials: deposit.WithdrawalCredentials,
+						},
+					},
+					PendingDeposits: []*electra.PendingDeposit{deposit},
+				}
+			}
+		}
+	}
+	// depositsMissingFromState now contains a map from pubkey to ValidatorSummary.
+	// We need to add each of them to the cache.
+	for _, summary := range depositsMissingFromState {
+		withdrawalAddress := common.BytesToAddress(summary.Validator.Validator.WithdrawalCredentials[12:])
+		cache.summaries[withdrawalAddress] = append(cache.summaries[withdrawalAddress], summary)
+	}
 }
 
 func (c *Client) handleHeadEvent(ctx context.Context, head *apiv1.HeadEvent) {
