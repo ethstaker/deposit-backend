@@ -11,18 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func TestAddMissingValidatorDeposits_EmptyList(t *testing.T) {
-	cache := &cacheRecord{
-		summaries: make(map[common.Address]ValidatorSummaries),
-	}
-
-	addMissingValidatorDeposits(nil, cache)
-
-	if len(cache.summaries) != 0 {
-		t.Fatalf("Expected empty cache, got %d entries", len(cache.summaries))
-	}
-}
-
 func TestAddMissingValidatorDeposits_SingleDeposit(t *testing.T) {
 	const pubkeyHex = "0x111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
 	const executionAddressHex = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -38,6 +26,7 @@ func TestAddMissingValidatorDeposits_SingleDeposit(t *testing.T) {
 		t.Fatalf("Failed to decode execution address: %v", err)
 	}
 	copy(withdrawalCreds[12:], executionAddressBytes)
+	withdrawalCreds[0] = 0x02 // Use 0x02 prefix for valid withdrawal credentials
 
 	deposit := &electra.PendingDeposit{
 		Pubkey:                phase0.BLSPubKey(pubkey),
@@ -93,7 +82,7 @@ func TestAddMissingValidatorDeposits_MultipleDepositsSamePubkey(t *testing.T) {
 		t.Fatalf("Failed to decode execution address: %v", err)
 	}
 	copy(firstWithdrawalCreds[12:], executionAddressBytes)
-	firstWithdrawalCreds[0] = 0x00
+	firstWithdrawalCreds[0] = 0x02 // Use 0x02 prefix for valid withdrawal credentials
 
 	var secondWithdrawalCreds [32]byte
 	copy(secondWithdrawalCreds[12:], executionAddressBytes)
@@ -178,6 +167,7 @@ func TestAddMissingValidatorDeposits_MultipleDepositsDifferentPubkeys(t *testing
 		t.Fatalf("Failed to decode execution address 1: %v", err)
 	}
 	copy(withdrawalCreds1[12:], executionAddress1Bytes)
+	withdrawalCreds1[0] = 0x02 // Use 0x02 prefix for valid withdrawal credentials
 
 	var withdrawalCreds2 [32]byte
 	executionAddress2Bytes, err := hex.DecodeString(executionAddress2Hex[2:])
@@ -185,6 +175,7 @@ func TestAddMissingValidatorDeposits_MultipleDepositsDifferentPubkeys(t *testing
 		t.Fatalf("Failed to decode execution address 2: %v", err)
 	}
 	copy(withdrawalCreds2[12:], executionAddress2Bytes)
+	withdrawalCreds2[0] = 0x02 // Use 0x02 prefix for valid withdrawal credentials
 
 	deposits := []*electra.PendingDeposit{
 		{
@@ -248,6 +239,7 @@ func TestAddMissingValidatorDeposits_IgnoresExistingValidators(t *testing.T) {
 		t.Fatalf("Failed to decode execution address: %v", err)
 	}
 	copy(withdrawalCreds[12:], executionAddressBytes)
+	withdrawalCreds[0] = 0x02 // Use 0x02 prefix for valid withdrawal credentials
 
 	// Create an existing validator in the cache
 	executionAddress := common.BytesToAddress(executionAddressBytes)
@@ -311,6 +303,7 @@ func TestAddMissingValidatorDeposits_MixedExistingAndMissing(t *testing.T) {
 		t.Fatalf("Failed to decode existing execution address: %v", err)
 	}
 	copy(existingWithdrawalCreds[12:], existingExecutionAddressBytes)
+	existingWithdrawalCreds[0] = 0x02 // Use 0x02 prefix for valid withdrawal credentials
 
 	var missingWithdrawalCreds [32]byte
 	missingExecutionAddressBytes, err := hex.DecodeString(missingExecutionAddressHex[2:])
@@ -318,6 +311,7 @@ func TestAddMissingValidatorDeposits_MixedExistingAndMissing(t *testing.T) {
 		t.Fatalf("Failed to decode missing execution address: %v", err)
 	}
 	copy(missingWithdrawalCreds[12:], missingExecutionAddressBytes)
+	missingWithdrawalCreds[0] = 0x02 // Use 0x02 prefix for valid withdrawal credentials
 
 	// Create an existing validator in the cache
 	existingExecutionAddress := common.BytesToAddress(existingExecutionAddressBytes)
@@ -375,5 +369,138 @@ func TestAddMissingValidatorDeposits_MixedExistingAndMissing(t *testing.T) {
 	}
 	if len(missingSummaries[0].PendingDeposits) != 1 {
 		t.Fatalf("Expected 1 pending deposit in missing summary, got %d", len(missingSummaries[0].PendingDeposits))
+	}
+}
+
+func TestAddMissingValidatorDeposits_Ignores0x00PrefixedDeposits(t *testing.T) {
+	const pubkeyHex = "0x888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888"
+	const executionAddressHex = "0x9999999999999999999999999999999999999999"
+
+	pubkey, err := hex.DecodeString(pubkeyHex[2:])
+	if err != nil {
+		t.Fatalf("Failed to decode pubkey: %v", err)
+	}
+
+	var firstWithdrawalCreds [32]byte
+	executionAddressBytes, err := hex.DecodeString(executionAddressHex[2:])
+	if err != nil {
+		t.Fatalf("Failed to decode execution address: %v", err)
+	}
+	copy(firstWithdrawalCreds[12:], executionAddressBytes)
+	firstWithdrawalCreds[0] = 0x00 // First deposit has 0x00 prefix - should be ignored
+
+	var secondWithdrawalCreds [32]byte
+	copy(secondWithdrawalCreds[12:], executionAddressBytes)
+	secondWithdrawalCreds[0] = 0x01 // Second deposit has 0x01 prefix
+
+	var thirdWithdrawalCreds [32]byte
+	copy(thirdWithdrawalCreds[12:], executionAddressBytes)
+	thirdWithdrawalCreds[0] = 0x02 // Third deposit has 0x02 prefix
+
+	deposits := []*electra.PendingDeposit{
+		{
+			Pubkey:                phase0.BLSPubKey(pubkey),
+			WithdrawalCredentials: firstWithdrawalCreds[:], // First deposit with 0x00 prefix
+		},
+		{
+			Pubkey:                phase0.BLSPubKey(pubkey),
+			WithdrawalCredentials: secondWithdrawalCreds[:], // Second deposit with 0x01 prefix
+		},
+		{
+			Pubkey:                phase0.BLSPubKey(pubkey),
+			WithdrawalCredentials: thirdWithdrawalCreds[:], // Third deposit with 0x02 prefix
+		},
+	}
+
+	cache := &cacheRecord{
+		summaries: make(map[common.Address]ValidatorSummaries),
+	}
+
+	addMissingValidatorDeposits(deposits, cache)
+
+	// Verify that nothing was added to the cache because the first deposit has 0x00 prefix
+	executionAddress := common.BytesToAddress(executionAddressBytes)
+	summaries, ok := cache.summaries[executionAddress]
+	if ok {
+		t.Fatalf("Expected no summary to be added to cache (0x00 prefix should be ignored), but got %d summaries", len(summaries))
+	}
+
+	// Verify the cache is empty
+	if len(cache.summaries) != 0 {
+		t.Fatalf("Expected empty cache, got %d entries", len(cache.summaries))
+	}
+}
+
+func TestAddMissingValidatorDeposits_Ignores0x00PrefixedDepositsWithDifferentPubkeys(t *testing.T) {
+	const pubkey1Hex = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const pubkey2Hex = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	const executionAddress1Hex = "0x1111111111111111111111111111111111111111"
+	const executionAddress2Hex = "0x2222222222222222222222222222222222222222"
+
+	pubkey1, err := hex.DecodeString(pubkey1Hex[2:])
+	if err != nil {
+		t.Fatalf("Failed to decode pubkey1: %v", err)
+	}
+
+	pubkey2, err := hex.DecodeString(pubkey2Hex[2:])
+	if err != nil {
+		t.Fatalf("Failed to decode pubkey2: %v", err)
+	}
+
+	var withdrawalCreds1 [32]byte
+	executionAddress1Bytes, err := hex.DecodeString(executionAddress1Hex[2:])
+	if err != nil {
+		t.Fatalf("Failed to decode execution address 1: %v", err)
+	}
+	copy(withdrawalCreds1[12:], executionAddress1Bytes)
+	withdrawalCreds1[0] = 0x00 // 0x00 prefix - should be ignored
+
+	var withdrawalCreds2 [32]byte
+	executionAddress2Bytes, err := hex.DecodeString(executionAddress2Hex[2:])
+	if err != nil {
+		t.Fatalf("Failed to decode execution address 2: %v", err)
+	}
+	copy(withdrawalCreds2[12:], executionAddress2Bytes)
+	withdrawalCreds2[0] = 0x02 // 0x02 prefix - should be added
+
+	deposits := []*electra.PendingDeposit{
+		{
+			Pubkey:                phase0.BLSPubKey(pubkey1),
+			WithdrawalCredentials: withdrawalCreds1[:], // 0x00 prefix - should be ignored
+		},
+		{
+			Pubkey:                phase0.BLSPubKey(pubkey2),
+			WithdrawalCredentials: withdrawalCreds2[:], // 0x02 prefix - should be added
+		},
+	}
+
+	cache := &cacheRecord{
+		summaries: make(map[common.Address]ValidatorSummaries),
+	}
+
+	addMissingValidatorDeposits(deposits, cache)
+
+	// Verify that pubkey1 (0x00 prefix) was not added
+	executionAddress1 := common.BytesToAddress(executionAddress1Bytes)
+	_, ok1 := cache.summaries[executionAddress1]
+	if ok1 {
+		t.Fatalf("Expected pubkey1 summary to be ignored (0x00 prefix), but it was added")
+	}
+
+	// Verify that pubkey2 (0x02 prefix) was added
+	executionAddress2 := common.BytesToAddress(executionAddress2Bytes)
+	summaries2, ok2 := cache.summaries[executionAddress2]
+	if !ok2 {
+		t.Fatalf("Expected pubkey2 summary to be added to cache")
+	}
+
+	if len(summaries2) != 1 {
+		t.Fatalf("Expected 1 summary for pubkey2, got %d", len(summaries2))
+	}
+
+	var expectedPubkey2 phase0.BLSPubKey
+	copy(expectedPubkey2[:], pubkey2)
+	if summaries2[0].Validator.Validator.PublicKey != expectedPubkey2 {
+		t.Fatalf("Expected summary 2 to have pubkey2, got %x, expected %x", summaries2[0].Validator.Validator.PublicKey, expectedPubkey2)
 	}
 }

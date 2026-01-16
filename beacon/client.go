@@ -292,6 +292,10 @@ func addMissingValidatorDeposits(pendingDepositsList []*electra.PendingDeposit, 
 	// We need to add each of them to the cache.
 	for _, summary := range depositsMissingFromState {
 		withdrawalAddress := common.BytesToAddress(summary.Validator.Validator.WithdrawalCredentials[12:])
+		// Ignore 0x00 withdrawal addresses.
+		if bytes.HasPrefix(summary.Validator.Validator.WithdrawalCredentials, []byte{0x00}) {
+			continue
+		}
 		cache.summaries[withdrawalAddress] = append(cache.summaries[withdrawalAddress], summary)
 	}
 }
