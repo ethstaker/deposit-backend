@@ -5,18 +5,32 @@ import (
 	"io"
 	"log/slog"
 	"net/url"
+	"strings"
+
+	"github.com/rs/zerolog"
 )
 
 type logLevelValue struct {
-	slog.Level
+	slogLevel    slog.Level
+	zerologLevel zerolog.Level
 }
 
 func (l *logLevelValue) Set(s string) error {
-	return l.UnmarshalText([]byte(s))
+	var err error
+	if strings.ToUpper(s) == "TRACE" {
+		l.slogLevel = slog.LevelDebug
+	} else {
+		err = l.slogLevel.UnmarshalText([]byte(s))
+		if err != nil {
+			return err
+		}
+	}
+	l.zerologLevel, err = zerolog.ParseLevel(s)
+	return err
 }
 
 func (l *logLevelValue) String() string {
-	return l.Level.String()
+	return l.zerologLevel.String()
 }
 
 type logFormatValue struct {

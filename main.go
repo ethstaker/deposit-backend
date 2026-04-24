@@ -16,10 +16,19 @@ var (
 	port            = flag.Int("port", 8080, "The port to listen on")
 	host            = flag.String("host", "127.0.0.1", "The host to listen on")
 	refreshInterval = flag.Uint64("refreshInterval", 4, "How many slots to wait between refreshes of the index")
-	beaconUrl       beaconUrlValue
+	beaconUrls      []string
 	logLevel        logLevelValue
 	logFormat       logFormatValue
 )
+
+func parseBeaconUrl(s string) error {
+	beaconUrl := &beaconUrlValue{}
+	if err := beaconUrl.Set(s); err != nil {
+		return err
+	}
+	beaconUrls = append(beaconUrls, beaconUrl.String())
+	return nil
+}
 
 func main() {
 	// Initialize non-primitive flags
@@ -27,18 +36,20 @@ func main() {
 	logLevel.Set("info")
 	flag.Var(&logFormat, "log-format", "The log format to use - 'text' or 'json'")
 	logFormat.Set("text")
-	flag.Var(&beaconUrl, "beacon-url", "The beacon URL to use")
-	beaconUrl.Set("http://localhost:5052")
+	flag.Func("beacon-url", "The beacon URL to use. May be repeated.", parseBeaconUrl)
 	flag.Parse()
 
-	handler := logFormat.Handler(os.Stdout, &slog.HandlerOptions{Level: logLevel.Level})
+	if len(beaconUrls) == 0 {
+		_ = parseBeaconUrl("http://localhost:5052")
+	}
+	handler := logFormat.Handler(os.Stdout, &slog.HandlerOptions{Level: logLevel.slogLevel})
 	logger := slog.New(handler)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Create the beacon client
-	beaconClient, err := beacon.NewClient(ctx, logger, logLevel.Level, beaconUrl.String(), *refreshInterval)
+	beaconClient, err := beacon.NewClient(ctx, logger, logLevel.zerologLevel, beaconUrls, *refreshInterval)
 	if err != nil {
 		logger.Error("Failed to create beacon client", "error", err)
 		os.Exit(1)
