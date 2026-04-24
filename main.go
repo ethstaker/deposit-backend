@@ -42,14 +42,14 @@ func main() {
 	if len(beaconUrls) == 0 {
 		_ = parseBeaconUrl("http://localhost:5052")
 	}
-	handler := logFormat.Handler(os.Stdout, &slog.HandlerOptions{Level: logLevel.Level})
+	handler := logFormat.Handler(os.Stdout, &slog.HandlerOptions{Level: logLevel.slogLevel})
 	logger := slog.New(handler)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// Create the beacon client
-	beaconClient, err := beacon.NewClient(ctx, logger, logLevel.Level, beaconUrls, *refreshInterval)
+	beaconClient, err := beacon.NewClient(ctx, logger, logLevel.zerologLevel, beaconUrls, *refreshInterval)
 	if err != nil {
 		logger.Error("Failed to create beacon client", "error", err)
 		os.Exit(1)

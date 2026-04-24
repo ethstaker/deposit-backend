@@ -43,22 +43,7 @@ type Client struct {
 
 var _ BeaconProvider = (*Client)(nil)
 
-func slogToZerologLevel(level slog.Level) zerolog.Level {
-	switch level {
-	case slog.LevelDebug:
-		return zerolog.DebugLevel
-	case slog.LevelInfo:
-		return zerolog.InfoLevel
-	case slog.LevelWarn:
-		return zerolog.WarnLevel
-	case slog.LevelError:
-		return zerolog.ErrorLevel
-	default:
-		return zerolog.InfoLevel
-	}
-}
-
-func NewClient(ctx context.Context, logger *slog.Logger, level slog.Level, beaconUrls []string, refreshInterval uint64) (*Client, error) {
+func NewClient(ctx context.Context, logger *slog.Logger, level zerolog.Level, beaconUrls []string, refreshInterval uint64) (*Client, error) {
 	out := new(Client)
 	out.refreshInterval = refreshInterval
 
@@ -66,7 +51,7 @@ func NewClient(ctx context.Context, logger *slog.Logger, level slog.Level, beaco
 	ctx, cancel := context.WithCancel(ctx)
 	client, err := multi.New(ctx,
 		multi.WithAddresses(beaconUrls),
-		multi.WithLogLevel(slogToZerologLevel(level)),
+		multi.WithLogLevel(level),
 	)
 	if err != nil {
 		cancel()
