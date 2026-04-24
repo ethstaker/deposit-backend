@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	nativehttp "net/http"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,7 +14,7 @@ import (
 	eth2client "github.com/attestantio/go-eth2-client"
 	"github.com/attestantio/go-eth2-client/api"
 	apiv1 "github.com/attestantio/go-eth2-client/api/v1"
-	http "github.com/attestantio/go-eth2-client/http"
+	"github.com/attestantio/go-eth2-client/multi"
 	"github.com/attestantio/go-eth2-client/spec/electra"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
@@ -58,15 +58,15 @@ func slogToZerologLevel(level slog.Level) zerolog.Level {
 	}
 }
 
-func NewClient(ctx context.Context, logger *slog.Logger, level slog.Level, beaconUrl string, refreshInterval uint64) (*Client, error) {
+func NewClient(ctx context.Context, logger *slog.Logger, level slog.Level, beaconUrls []string, refreshInterval uint64) (*Client, error) {
 	out := new(Client)
 	out.refreshInterval = refreshInterval
 
-	logger.Debug("connecting to beacon node", "url", beaconUrl)
+	logger.Debug("connecting to beacon node", "urls", beaconUrls)
 	ctx, cancel := context.WithCancel(ctx)
-	client, err := http.New(ctx,
-		http.WithAddress(beaconUrl),
-		http.WithLogLevel(slogToZerologLevel(level)),
+	client, err := multi.New(ctx,
+		multi.WithAddresses(beaconUrls),
+		multi.WithLogLevel(slogToZerologLevel(level)),
 	)
 	if err != nil {
 		cancel()
@@ -106,7 +106,7 @@ func NewClient(ctx context.Context, logger *slog.Logger, level slog.Level, beaco
 func errorIs404(err error) bool {
 	var apiErr *api.Error
 	if errors.As(err, &apiErr) {
-		return apiErr.StatusCode == nativehttp.StatusNotFound
+		return apiErr.StatusCode == http.StatusNotFound
 	}
 	return false
 }
@@ -119,7 +119,7 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 	}
 	defer c.updateMutex.Unlock()
 
-	client := c.beacon.(*http.Service)
+	client := c.beacon.(*multi.Service)
 
 	deadline, ok := ctx.Deadline()
 	if !ok {
@@ -322,7 +322,7 @@ func (c *Client) LookupValidator(ctx context.Context, pubkey phase0.BLSPubKey) (
 	commonOpts := api.CommonOpts{
 		Timeout: time.Until(deadline),
 	}
-	httpClient := c.beacon.(*http.Service)
+	httpClient := c.beacon.(*multi.Service)
 	validator, err := httpClient.Validators(ctx, &api.ValidatorsOpts{
 		PubKeys: []phase0.BLSPubKey{pubkey},
 		State:   "head",
