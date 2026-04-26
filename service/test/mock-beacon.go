@@ -13,12 +13,17 @@ import (
 
 type MockBeacon struct {
 	MockValidators            map[phase0.BLSPubKey]*apiv1.Validator
+	MockHead                  beacon.HeadInfo
 	PendingConsolidations     []*electra.PendingConsolidation
 	PendingDeposits           []*electra.PendingDeposit
 	PendingPartialWithdrawals []*electra.PendingPartialWithdrawal
 }
 
 var _ beacon.BeaconProvider = (*MockBeacon)(nil)
+
+func (m *MockBeacon) Head(_ context.Context) (beacon.HeadInfo, error) {
+	return m.MockHead, nil
+}
 
 func (m *MockBeacon) LookupValidator(ctx context.Context, pubkey phase0.BLSPubKey) (*apiv1.Validator, error) {
 	validator, ok := m.MockValidators[pubkey]

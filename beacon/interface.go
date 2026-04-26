@@ -10,8 +10,14 @@ import (
 )
 
 type BeaconProvider interface {
+	Head(ctx context.Context) (HeadInfo, error)
 	LookupValidator(ctx context.Context, pubkey phase0.BLSPubKey) (*apiv1.Validator, error)
 	Validators(ctx context.Context, executionAddress common.Address) (ValidatorSummaries, error)
+}
+
+type HeadInfo struct {
+	Slot  phase0.Slot  `json:"slot"`
+	Epoch phase0.Epoch `json:"epoch"`
 }
 
 type ValidatorSummary struct {

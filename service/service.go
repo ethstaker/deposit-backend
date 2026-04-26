@@ -40,6 +40,9 @@ func (s *Service) Run() error {
 		w.Write([]byte("OK\n"))
 	})
 
+	headHandler := handlers.NewHeadHandler(s.Logger, s.Beacon)
+	serveMux.Handle(headHandler.Pattern(), headHandler)
+
 	byPubkeyHandler := handlers.NewValidatorHandler(s.Logger, s.Beacon)
 	serveMux.Handle(byPubkeyHandler.Pattern(), byPubkeyHandler)
 

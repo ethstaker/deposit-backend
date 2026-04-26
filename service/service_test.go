@@ -65,6 +65,7 @@ func init() {
 	}
 	copy(withdrawalCreds2[12:], validExecutionAddressBytes2)
 	testMockBeacon = &test.MockBeacon{
+		MockHead: beacon.HeadInfo{Slot: 12800, Epoch: 400},
 		MockValidators: map[phase0.BLSPubKey]*apiv1.Validator{
 			phase0.BLSPubKey(pubkey): {
 				Index:   1,
@@ -393,5 +394,43 @@ func TestValidatorsHandler(t *testing.T) {
 
 	if len(responseValidators[1].PendingPartialWithdrawals) != 0 {
 		t.Fatalf("Expected 0 pending partial withdrawals, got %d", len(responseValidators[1].PendingPartialWithdrawals))
+	}
+}
+
+func TestHeadHandler(t *testing.T) {
+	svc := Service{
+		Context:  t.Context(),
+		Logger:   newTestLogger(t),
+		Beacon:   testMockBeacon,
+		Listener: httptest.NewUnstartedServer(nil).Listener,
+		Port:     0,
+	}
+
+	go func() {
+		if err := svc.Run(); err != nil {
+			panic(err)
+		}
+	}()
+
+	resp, err := http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/head")
+	if err != nil {
+		t.Fatalf("Failed to get head: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	var head beacon.HeadInfo
+	if err := json.NewDecoder(resp.Body).Decode(&head); err != nil {
+		t.Fatalf("Failed to decode head: %v", err)
+	}
+
+	if head.Slot != testMockBeacon.MockHead.Slot {
+		t.Fatalf("Expected slot %d, got %d", testMockBeacon.MockHead.Slot, head.Slot)
+	}
+	if head.Epoch != testMockBeacon.MockHead.Epoch {
+		t.Fatalf("Expected epoch %d, got %d", testMockBeacon.MockHead.Epoch, head.Epoch)
 	}
 }
