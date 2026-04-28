@@ -297,6 +297,24 @@ func (c *Client) Stop() {
 	c.cancel()
 }
 
+func (c *Client) Head(ctx context.Context) (HeadInfo, error) {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		deadline = time.Now().Add(12 * time.Second)
+	}
+	client := c.beacon.(*multi.Service)
+	resp, err := client.BeaconBlockHeader(ctx, &api.BeaconBlockHeaderOpts{
+		Block:  "head",
+		Common: api.CommonOpts{Timeout: time.Until(deadline)},
+	})
+	if err != nil {
+		return HeadInfo{}, fmt.Errorf("failed to get beacon block header: %w", err)
+	}
+	return HeadInfo{
+		Slot: resp.Data.Header.Message.Slot,
+	}, nil
+}
+
 // Simply pass-through for the regular validator query.
 func (c *Client) LookupValidator(ctx context.Context, pubkey phase0.BLSPubKey) (*apiv1.Validator, error) {
 
