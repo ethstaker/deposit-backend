@@ -65,7 +65,7 @@ func init() {
 	}
 	copy(withdrawalCreds2[12:], validExecutionAddressBytes2)
 	testMockBeacon = &test.MockBeacon{
-		MockHead: beacon.HeadInfo{Slot: 12800, Epoch: 400},
+		MockHead: beacon.HeadInfo{Slot: 12800},
 		MockValidators: map[phase0.BLSPubKey]*apiv1.Validator{
 			phase0.BLSPubKey(pubkey): {
 				Index:   1,
@@ -429,8 +429,5 @@ func TestHeadHandler(t *testing.T) {
 
 	if head.Slot != testMockBeacon.MockHead.Slot {
 		t.Fatalf("Expected slot %d, got %d", testMockBeacon.MockHead.Slot, head.Slot)
-	}
-	if head.Epoch != testMockBeacon.MockHead.Epoch {
-		t.Fatalf("Expected epoch %d, got %d", testMockBeacon.MockHead.Epoch, head.Epoch)
 	}
 }

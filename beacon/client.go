@@ -41,8 +41,6 @@ type Client struct {
 	refreshInterval uint64
 }
 
-const slotsPerEpoch = 32
-
 var _ BeaconProvider = (*Client)(nil)
 
 func NewClient(ctx context.Context, logger *slog.Logger, level zerolog.Level, beaconUrls []string, refreshInterval uint64) (*Client, error) {
@@ -312,10 +310,8 @@ func (c *Client) Head(ctx context.Context) (HeadInfo, error) {
 	if err != nil {
 		return HeadInfo{}, fmt.Errorf("failed to get beacon block header: %w", err)
 	}
-	slot := resp.Data.Header.Message.Slot
 	return HeadInfo{
-		Slot:  slot,
-		Epoch: phase0.Epoch(uint64(slot) / slotsPerEpoch),
+		Slot: resp.Data.Header.Message.Slot,
 	}, nil
 }
 

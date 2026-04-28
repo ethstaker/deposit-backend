@@ -16,8 +16,7 @@ type BeaconProvider interface {
 }
 
 type HeadInfo struct {
-	Slot  phase0.Slot  `json:"slot"`
-	Epoch phase0.Epoch `json:"epoch"`
+	Slot phase0.Slot `json:"slot"`
 }
 
 type ValidatorSummary struct {
