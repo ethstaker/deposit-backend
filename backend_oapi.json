@@ -6,6 +6,48 @@
         "version": "0.0.1"
     },
     "paths": {
+        "/api/v1/builders/{execution_address}": {
+            "get": {
+                "summary": "Get builders by execution address",
+                "parameters": [
+                    {
+                        "name": "execution_address",
+                        "in": "path",
+                        "required": true,
+                        "description": "The execution address to search for builders",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{40}$",
+                            "example": "0x0011223344556677889900112233445566778899"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved builders",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/BuilderInfo"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid execution address format"
+                    },
+                    "404": {
+                        "description": "No builders found for the given execution address"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            }
+        },
         "/api/v1/validators/{execution_address}": {
             "get": {
                 "summary": "Get validators by execution address",
@@ -88,10 +130,75 @@
                     }
                 }
             }
+        },
+        "/api/v1/builder/{public_key}": {
+            "get": {
+                "summary": "Get builder by public key",
+                "description": "Retrieve a builder by its public key",
+                "parameters": [
+                    {
+                        "name": "public_key",
+                        "in": "path",
+                        "required": true,
+                        "description": "The public key of the builder",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^0x[a-fA-F0-9]{96}$",
+                            "example": "0x001122334455667788990011223344556677889900112233445566778899001122334455667788990011223344556677889900112233445566778899"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved builder",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BuilderInfo"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid public key format"
+                    },
+                    "404": {
+                        "description": "No builder found for the given public key"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                }
+            }
         }
     },
     "components": {
         "schemas": {
+            "BuilderInfo": {
+                "type": "object",
+                "required": [
+                    "builder"
+                ],
+                "properties": {
+                    "builder": {
+                        "$ref": "https://raw.githubusercontent.com/ethereum/beacon-APIs/master/types/api.yaml#/components/schemas/BuilderResponse"
+                    },
+                    "pending_payments": {
+                        "type": "array",
+                        "description": "Pending payments from the builder",
+                        "items": {
+                            "$ref": "TODO"
+                        }
+                    },
+                    "pending_withdrawals": {
+                        "type": "array",
+                        "description": "Pending partial withdrawals from the builder",
+                        "items": {
+                            "$ref": "TODO"
+                        }
+                    }
+                }
+            },
             "ValidatorInfo": {
                 "type": "object",
                 "required": [
