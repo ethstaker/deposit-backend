@@ -1,6 +1,10 @@
 deposit-backend: $(shell find . -name '*.go')
 	go build -o deposit-backend . 
 
+.PHONY: lint
+lint:
+	npx --yes @redocly/cli lint backend_oapi.json
+
 .PHONY: test
 test:
 	go test ./...

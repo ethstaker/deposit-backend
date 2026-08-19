@@ -1,0 +1,7 @@
+extends:
+  - recommended
+
+rules:
+  spec-ref-siblings: off
+  security-defined: off
+  no-empty-servers: off
