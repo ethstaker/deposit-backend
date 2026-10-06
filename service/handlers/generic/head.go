@@ -1,4 +1,4 @@
-package handlers
+package generic
 
 import (
 	"context"
@@ -8,18 +8,19 @@ import (
 	"time"
 
 	"github.com/EthStaker/deposit-backend/beacon"
+	"github.com/EthStaker/deposit-backend/service/handlers"
 )
 
 const HeadPattern = "GET /api/v1/head"
 
-var _ Handler = (*HeadHandler)(nil)
+var _ handlers.Handler = (*HeadHandler)(nil)
 
 type HeadHandler struct {
 	logger *slog.Logger
 	beacon beacon.BeaconProvider
 }
 
-func NewHeadHandler(logger *slog.Logger, b beacon.BeaconProvider) Handler {
+func NewHeadHandler(logger *slog.Logger, b beacon.BeaconProvider) handlers.Handler {
 	return &HeadHandler{
 		logger: logger.With("component", "head-handler"),
 		beacon: b,

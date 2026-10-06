@@ -1,4 +1,4 @@
-package handlers
+package validator
 
 import (
 	"context"
@@ -10,20 +10,21 @@ import (
 	"time"
 
 	"github.com/EthStaker/deposit-backend/beacon"
+	"github.com/EthStaker/deposit-backend/service/handlers"
 	apiv1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 )
 
 const ByPubkeyPattern = "GET /api/v1/validator/{public_key}"
 
-var _ Handler = (*ValidatorHandler)(nil)
+var _ handlers.Handler = (*ValidatorHandler)(nil)
 
 type ValidatorHandler struct {
 	logger *slog.Logger
 	beacon beacon.BeaconProvider
 }
 
-func NewValidatorHandler(logger *slog.Logger, beacon beacon.BeaconProvider) Handler {
+func NewValidatorHandler(logger *slog.Logger, beacon beacon.BeaconProvider) handlers.Handler {
 	logger = logger.With("component", "validator-handler")
 	return &ValidatorHandler{
 		logger: logger,

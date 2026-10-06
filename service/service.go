@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/EthStaker/deposit-backend/beacon"
-	"github.com/EthStaker/deposit-backend/service/handlers"
+	"github.com/EthStaker/deposit-backend/service/handlers/generic"
+	"github.com/EthStaker/deposit-backend/service/handlers/validator"
 )
 
 type Service struct {
@@ -40,13 +41,13 @@ func (s *Service) Run() error {
 		w.Write([]byte("OK\n"))
 	})
 
-	headHandler := handlers.NewHeadHandler(s.Logger, s.Beacon)
+	headHandler := generic.NewHeadHandler(s.Logger, s.Beacon)
 	serveMux.Handle(headHandler.Pattern(), headHandler)
 
-	byPubkeyHandler := handlers.NewValidatorHandler(s.Logger, s.Beacon)
+	byPubkeyHandler := validator.NewValidatorHandler(s.Logger, s.Beacon)
 	serveMux.Handle(byPubkeyHandler.Pattern(), byPubkeyHandler)
 
-	byExecutionAddressHandler := handlers.NewValidatorsHandler(s.Logger, s.Beacon)
+	byExecutionAddressHandler := validator.NewValidatorsHandler(s.Logger, s.Beacon)
 	serveMux.Handle(byExecutionAddressHandler.Pattern(), byExecutionAddressHandler)
 
 	server := &http.Server{
