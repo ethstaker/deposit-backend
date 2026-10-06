@@ -9,6 +9,7 @@ import (
 
 	"github.com/EthStaker/deposit-backend/beacon"
 	"github.com/EthStaker/deposit-backend/service/handlers"
+	"github.com/EthStaker/deposit-backend/service/middleware"
 )
 
 const HeadPattern = "GET /api/v1/head"
@@ -31,7 +32,11 @@ func (h *HeadHandler) Pattern() string {
 	return HeadPattern
 }
 
-func (h *HeadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *HeadHandler) Middleware() []middleware.Middleware {
+	return []middleware.Middleware{}
+}
+
+func (h *HeadHandler) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 

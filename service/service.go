@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/EthStaker/deposit-backend/beacon"
+	"github.com/EthStaker/deposit-backend/service/handlers"
 	"github.com/EthStaker/deposit-backend/service/handlers/generic"
 	"github.com/EthStaker/deposit-backend/service/handlers/validator"
 )
@@ -42,13 +43,13 @@ func (s *Service) Run() error {
 	})
 
 	headHandler := generic.NewHeadHandler(s.Logger, s.Beacon)
-	serveMux.Handle(headHandler.Pattern(), headHandler)
+	serveMux.Handle(headHandler.Pattern(), handlers.NativeHandler(headHandler))
 
 	byPubkeyHandler := validator.NewValidatorHandler(s.Logger, s.Beacon)
-	serveMux.Handle(byPubkeyHandler.Pattern(), byPubkeyHandler)
+	serveMux.Handle(byPubkeyHandler.Pattern(), handlers.NativeHandler(byPubkeyHandler))
 
 	byExecutionAddressHandler := validator.NewValidatorsHandler(s.Logger, s.Beacon)
-	serveMux.Handle(byExecutionAddressHandler.Pattern(), byExecutionAddressHandler)
+	serveMux.Handle(byExecutionAddressHandler.Pattern(), handlers.NativeHandler(byExecutionAddressHandler))
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.Port),
