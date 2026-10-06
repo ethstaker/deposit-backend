@@ -53,17 +53,17 @@ func TestExecutionAddressMiddleware(t *testing.T) {
 	mw := NewExecutionAddressMiddleware(discardLogger())
 
 	t.Run("missing execution address", func(t *testing.T) {
-		rec := call(t, mw, ExecutionAddressContextKey, "", false)
+		rec := call(t, mw, string(ExecutionAddressContextKey), "", false)
 		assertStatusAndBody(t, rec, http.StatusBadRequest, "Execution address is required")
 	})
 
 	t.Run("missing 0x prefix", func(t *testing.T) {
-		rec := call(t, mw, ExecutionAddressContextKey, "1111111111111111111111111111111111111111", true)
+		rec := call(t, mw, string(ExecutionAddressContextKey), "1111111111111111111111111111111111111111", true)
 		assertStatusAndBody(t, rec, http.StatusBadRequest, "Execution address must be 0x-prefixed")
 	})
 
 	t.Run("invalid length", func(t *testing.T) {
-		rec := call(t, mw, ExecutionAddressContextKey, "0xaa", true)
+		rec := call(t, mw, string(ExecutionAddressContextKey), "0xaa", true)
 		assertStatusAndBody(t, rec, http.StatusBadRequest, "Invalid execution address")
 	})
 }
@@ -72,17 +72,17 @@ func TestPubkeyMiddleware(t *testing.T) {
 	mw := NewPubkeyMiddleware(discardLogger())
 
 	t.Run("missing public key", func(t *testing.T) {
-		rec := call(t, mw, PubkeyContextKey, "", false)
+		rec := call(t, mw, string(PubkeyContextKey), "", false)
 		assertStatusAndBody(t, rec, http.StatusBadRequest, "Pubkey is required")
 	})
 
 	t.Run("missing 0x prefix", func(t *testing.T) {
-		rec := call(t, mw, PubkeyContextKey, "aa", true)
+		rec := call(t, mw, string(PubkeyContextKey), "aa", true)
 		assertStatusAndBody(t, rec, http.StatusBadRequest, "Public key must be 0x-prefixed")
 	})
 
 	t.Run("invalid length", func(t *testing.T) {
-		rec := call(t, mw, PubkeyContextKey, "0xaa", true)
+		rec := call(t, mw, string(PubkeyContextKey), "0xaa", true)
 		assertStatusAndBody(t, rec, http.StatusBadRequest, "Invalid public key length")
 	})
 }

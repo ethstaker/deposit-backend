@@ -39,7 +39,9 @@ func (h *BuilderHandler) Middleware() []middleware.Middleware {
 
 func (h *BuilderHandler) Error(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		h.logger.Debug("failed to encode error response", "error", err)
+	}
 }
 
 func (h *BuilderHandler) HandleHTTP(w http.ResponseWriter, r *http.Request) {

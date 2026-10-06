@@ -44,7 +44,9 @@ func (h *HeadHandler) HandleHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Error("failed to get head", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Failed to get head"})
+		if err := json.NewEncoder(w).Encode(map[string]string{"error": "Failed to get head"}); err != nil {
+			h.logger.Debug("failed to encode error response", "error", err)
+		}
 		return
 	}
 

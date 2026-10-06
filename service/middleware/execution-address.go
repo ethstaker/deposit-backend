@@ -11,7 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-const ExecutionAddressContextKey = "execution_address"
+type ExecutionAddressContextKeyType string
+
+const ExecutionAddressContextKey ExecutionAddressContextKeyType = "execution_address"
 
 type ExecutionAddressMiddleware struct {
 	logger *slog.Logger
@@ -25,7 +27,9 @@ func NewExecutionAddressMiddleware(logger *slog.Logger) Middleware {
 
 func (m *ExecutionAddressMiddleware) Error(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		m.logger.Debug("failed to encode error response", "error", err)
+	}
 }
 
 func (m *ExecutionAddressMiddleware) setAddress(r **http.Request, addr common.Address) {
@@ -40,7 +44,7 @@ func GetAddress(r *http.Request) common.Address {
 
 func (m *ExecutionAddressMiddleware) ServeHTTP(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		executionAddress := r.PathValue(ExecutionAddressContextKey)
+		executionAddress := r.PathValue(string(ExecutionAddressContextKey))
 		if executionAddress == "" {
 			http.Error(w, "Execution address is required", http.StatusBadRequest)
 			return

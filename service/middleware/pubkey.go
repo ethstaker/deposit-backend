@@ -11,7 +11,9 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 )
 
-const PubkeyContextKey = "public_key"
+type PubkeyContextKeyType string
+
+const PubkeyContextKey PubkeyContextKeyType = "public_key"
 
 type PubkeyMiddleware struct {
 	logger *slog.Logger
@@ -25,7 +27,9 @@ func NewPubkeyMiddleware(logger *slog.Logger) Middleware {
 
 func (m *PubkeyMiddleware) Error(w http.ResponseWriter, status int, message string) {
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": message}); err != nil {
+		m.logger.Debug("failed to encode error response", "error", err)
+	}
 }
 
 func (m *PubkeyMiddleware) setPubkey(r **http.Request, pubkey phase0.BLSPubKey) {
@@ -40,7 +44,7 @@ func GetPubkey(r *http.Request) phase0.BLSPubKey {
 
 func (m *PubkeyMiddleware) ServeHTTP(next http.HandlerFunc) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pubkeyString := r.PathValue(PubkeyContextKey)
+		pubkeyString := r.PathValue(string(PubkeyContextKey))
 		if pubkeyString == "" {
 			http.Error(w, "Pubkey is required", http.StatusBadRequest)
 			return

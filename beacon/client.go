@@ -351,7 +351,10 @@ func (c *Client) handleHeadEvent(ctx context.Context, head *apiv1.HeadEvent) {
 	if c.refreshInterval > 0 && uint64(head.Slot)%c.refreshInterval != 0 {
 		return
 	}
-	c.updateCache(ctx, head.Slot)
+	err := c.updateCache(ctx, head.Slot)
+	if err != nil {
+		c.logger.Error("failed to update cache", "error", err)
+	}
 }
 
 func (c *Client) Stop() {

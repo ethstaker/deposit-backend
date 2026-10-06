@@ -33,9 +33,15 @@ func parseBeaconUrl(s string) error {
 func main() {
 	// Initialize non-primitive flags
 	flag.Var(&logLevel, "log-level", "The log level to use")
-	logLevel.Set("info")
+	err := logLevel.Set("info")
+	if err != nil {
+		panic(err)
+	}
 	flag.Var(&logFormat, "log-format", "The log format to use - 'text' or 'json'")
-	logFormat.Set("text")
+	err = logFormat.Set("text")
+	if err != nil {
+		panic(err)
+	}
 	flag.Func("beacon-url", "The beacon URL to use. May be repeated.", parseBeaconUrl)
 	flag.Parse()
 

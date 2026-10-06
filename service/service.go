@@ -40,7 +40,9 @@ func (s *Service) Run() error {
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK\n"))
+		if _, err := w.Write([]byte("OK\n")); err != nil {
+			s.Logger.Debug("failed to write health response", "error", err)
+		}
 	})
 
 	headHandler := generic.NewHeadHandler(s.Logger, s.Beacon)
@@ -76,7 +78,7 @@ func (s *Service) Run() error {
 	<-s.Context.Done()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 
 	s.Logger.Info("Stopping service")
 	return nil
