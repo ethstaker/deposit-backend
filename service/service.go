@@ -11,6 +11,9 @@ import (
 
 	"github.com/EthStaker/deposit-backend/beacon"
 	"github.com/EthStaker/deposit-backend/service/handlers"
+	"github.com/EthStaker/deposit-backend/service/handlers/builder"
+	"github.com/EthStaker/deposit-backend/service/handlers/generic"
+	"github.com/EthStaker/deposit-backend/service/handlers/validator"
 )
 
 type Service struct {
@@ -37,17 +40,28 @@ func (s *Service) Run() error {
 	serveMux := http.NewServeMux()
 	serveMux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK\n"))
+		if _, err := w.Write([]byte("OK\n")); err != nil {
+			s.Logger.Debug("failed to write health response", "error", err)
+		}
 	})
 
-	headHandler := handlers.NewHeadHandler(s.Logger, s.Beacon)
-	serveMux.Handle(headHandler.Pattern(), headHandler)
+	headHandler := generic.NewHeadHandler(s.Logger, s.Beacon)
+	serveMux.Handle(headHandler.Pattern(), handlers.NativeHandler(headHandler))
 
-	byPubkeyHandler := handlers.NewValidatorHandler(s.Logger, s.Beacon)
-	serveMux.Handle(byPubkeyHandler.Pattern(), byPubkeyHandler)
+	addressHandler := generic.NewAddressHandler(s.Logger, s.Beacon)
+	serveMux.Handle(addressHandler.Pattern(), handlers.NativeHandler(addressHandler))
 
-	byExecutionAddressHandler := handlers.NewValidatorsHandler(s.Logger, s.Beacon)
-	serveMux.Handle(byExecutionAddressHandler.Pattern(), byExecutionAddressHandler)
+	byPubkeyHandler := validator.NewValidatorHandler(s.Logger, s.Beacon)
+	serveMux.Handle(byPubkeyHandler.Pattern(), handlers.NativeHandler(byPubkeyHandler))
+
+	byExecutionAddressHandler := validator.NewValidatorsHandler(s.Logger, s.Beacon)
+	serveMux.Handle(byExecutionAddressHandler.Pattern(), handlers.NativeHandler(byExecutionAddressHandler))
+
+	builderByPubkeyHandler := builder.NewBuilderHandler(s.Logger, s.Beacon)
+	serveMux.Handle(builderByPubkeyHandler.Pattern(), handlers.NativeHandler(builderByPubkeyHandler))
+
+	buildersByExecutionAddressHandler := builder.NewBuildersHandler(s.Logger, s.Beacon)
+	serveMux.Handle(buildersByExecutionAddressHandler.Pattern(), handlers.NativeHandler(buildersByExecutionAddressHandler))
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.Port),
@@ -64,7 +78,7 @@ func (s *Service) Run() error {
 	<-s.Context.Done()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownCancel()
-	server.Shutdown(shutdownCtx)
+	_ = server.Shutdown(shutdownCtx)
 
 	s.Logger.Info("Stopping service")
 	return nil

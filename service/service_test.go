@@ -1,17 +1,21 @@
 package service
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"testing"
 
 	"github.com/EthStaker/deposit-backend/beacon"
 	"github.com/EthStaker/deposit-backend/service/test"
 	apiv1 "github.com/attestantio/go-eth2-client/api/v1"
+	"github.com/attestantio/go-eth2-client/spec/bellatrix"
 	"github.com/attestantio/go-eth2-client/spec/electra"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 )
 
@@ -64,6 +68,10 @@ func init() {
 		panic(err)
 	}
 	copy(withdrawalCreds2[12:], validExecutionAddressBytes2)
+	var executionAddress bellatrix.ExecutionAddress
+	copy(executionAddress[:], validExecutionAddressBytes)
+	var executionAddress2 bellatrix.ExecutionAddress
+	copy(executionAddress2[:], validExecutionAddressBytes2)
 	testMockBeacon = &test.MockBeacon{
 		MockHead: beacon.HeadInfo{Slot: 12800},
 		MockValidators: map[phase0.BLSPubKey]*apiv1.Validator{
@@ -110,6 +118,53 @@ func init() {
 		PendingPartialWithdrawals: []*electra.PendingPartialWithdrawal{
 			{
 				ValidatorIndex: 1,
+			},
+		},
+		MockBuilders: map[phase0.BLSPubKey]*beacon.BuilderResponse{
+			phase0.BLSPubKey(pubkey): {
+				Index:  1,
+				Status: "active",
+				Builder: &gloas.Builder{
+					PublicKey:        phase0.BLSPubKey(pubkey),
+					ExecutionAddress: executionAddress,
+				},
+			},
+			phase0.BLSPubKey(pubkey2): {
+				Index:  2,
+				Status: "active",
+				Builder: &gloas.Builder{
+					PublicKey:        phase0.BLSPubKey(pubkey2),
+					ExecutionAddress: executionAddress,
+				},
+			},
+			phase0.BLSPubKey(pubkey3): {
+				Index:  3,
+				Status: "active",
+				Builder: &gloas.Builder{
+					PublicKey:        phase0.BLSPubKey(pubkey3),
+					ExecutionAddress: executionAddress2,
+				},
+			},
+		},
+		BuilderPendingPayments: []*gloas.BuilderPendingPayment{
+			{
+				Weight:        1,
+				ProposerIndex: 1,
+				Withdrawal: &gloas.BuilderPendingWithdrawal{
+					BuilderIndex: 1,
+				},
+			},
+			{
+				Weight:        2,
+				ProposerIndex: 2,
+				Withdrawal: &gloas.BuilderPendingWithdrawal{
+					BuilderIndex: 2,
+				},
+			},
+		},
+		BuilderPendingWithdrawals: []*gloas.BuilderPendingWithdrawal{
+			{
+				BuilderIndex: 1,
 			},
 		},
 	}
@@ -367,6 +422,10 @@ func TestValidatorsHandler(t *testing.T) {
 
 	t.Logf("Response validators: %+v", responseValidators)
 
+	sort.Slice(responseValidators, func(i, j int) bool {
+		return responseValidators[i].Validator.Index < responseValidators[j].Validator.Index
+	})
+
 	// Make sure the response is correct
 	if len(responseValidators) != 2 {
 		t.Fatalf("Expected 2 validators, got %d", len(responseValidators))
@@ -394,6 +453,324 @@ func TestValidatorsHandler(t *testing.T) {
 
 	if len(responseValidators[1].PendingPartialWithdrawals) != 0 {
 		t.Fatalf("Expected 0 pending partial withdrawals, got %d", len(responseValidators[1].PendingPartialWithdrawals))
+	}
+}
+
+func TestBuilderHandlerErrors(t *testing.T) {
+	beacon := &test.MockBeacon{}
+	svc := Service{
+		Context:  t.Context(),
+		Logger:   newTestLogger(t),
+		Beacon:   beacon,
+		Listener: httptest.NewUnstartedServer(nil).Listener,
+		Port:     0,
+	}
+
+	go func() {
+		if err := svc.Run(); err != nil {
+			panic(err)
+		}
+	}()
+
+	resp, err := http.Get("http://" + svc.Listener.Addr().String() + "/health")
+	if err != nil {
+		t.Fatalf("Failed to get health: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builder/")
+	if err != nil {
+		t.Fatalf("Failed to get builder: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Expected status NotFound, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builder/0000000000000000000000000000000000000000000000000000000000000000")
+	if err != nil {
+		t.Fatalf("Failed to get builder: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status BadRequest, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builder/0xgg")
+	if err != nil {
+		t.Fatalf("Failed to get builder: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status BadRequest, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builder/0xaa")
+	if err != nil {
+		t.Fatalf("Failed to get builder: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status BadRequest, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builder/" + validPubkey)
+	if err != nil {
+		t.Fatalf("Failed to get builder: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Expected status NotFound, got %d", resp.StatusCode)
+	}
+}
+
+func TestBuilderHandler(t *testing.T) {
+	svc := Service{
+		Context:  t.Context(),
+		Logger:   newTestLogger(t),
+		Beacon:   testMockBeacon,
+		Listener: httptest.NewUnstartedServer(nil).Listener,
+		Port:     0,
+	}
+
+	go func() {
+		if err := svc.Run(); err != nil {
+			panic(err)
+		}
+	}()
+
+	resp, err := http.Get("http://" + svc.Listener.Addr().String() + "/health")
+	if err != nil {
+		t.Fatalf("Failed to get health: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builder/" + validPubkey)
+	if err != nil {
+		t.Fatalf("Failed to get builder: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	var builder beacon.BuilderResponse
+	if err := json.NewDecoder(resp.Body).Decode(&builder); err != nil {
+		t.Fatalf("Failed to decode builder: %v", err)
+	}
+
+	if builder.Index != 1 {
+		t.Fatalf("Expected builder index 1, got %d", builder.Index)
+	}
+	if builder.Status != "active" {
+		t.Fatalf("Expected builder status active, got %s", builder.Status)
+	}
+}
+
+func TestBuildersHandlerErrors(t *testing.T) {
+	beacon := &test.MockBeacon{}
+	svc := Service{
+		Context:  t.Context(),
+		Logger:   newTestLogger(t),
+		Beacon:   beacon,
+		Listener: httptest.NewUnstartedServer(nil).Listener,
+		Port:     0,
+	}
+
+	go func() {
+		if err := svc.Run(); err != nil {
+			panic(err)
+		}
+	}()
+
+	resp, err := http.Get("http://" + svc.Listener.Addr().String() + "/health")
+	if err != nil {
+		t.Fatalf("Failed to get health: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builders/")
+	if err != nil {
+		t.Fatalf("Failed to get builders: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Expected status NotFound, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builders/0000000000000000000000000000000000000000000000000000000000000000")
+	if err != nil {
+		t.Fatalf("Failed to get builders: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status BadRequest, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builders/0xgg")
+	if err != nil {
+		t.Fatalf("Failed to get builders: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status BadRequest, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builders/0xaa")
+	if err != nil {
+		t.Fatalf("Failed to get builders: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("Expected status BadRequest, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builders/" + validExecutionAddress)
+	if err != nil {
+		t.Fatalf("Failed to get builders: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Expected status NotFound, got %d", resp.StatusCode)
+	}
+}
+
+func TestBuildersHandler(t *testing.T) {
+	svc := Service{
+		Context:  t.Context(),
+		Logger:   newTestLogger(t),
+		Beacon:   testMockBeacon,
+		Listener: httptest.NewUnstartedServer(nil).Listener,
+		Port:     0,
+	}
+
+	go func() {
+		if err := svc.Run(); err != nil {
+			panic(err)
+		}
+	}()
+
+	resp, err := http.Get("http://" + svc.Listener.Addr().String() + "/health")
+	if err != nil {
+		t.Fatalf("Failed to get health: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builders/" + validExecutionAddress)
+	if err != nil {
+		t.Fatalf("Failed to get builders: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	var responseBuilders beacon.BuilderSummaries
+	if err := json.NewDecoder(resp.Body).Decode(&responseBuilders); err != nil {
+		t.Fatalf("Failed to decode builders: %v", err)
+	}
+
+	sort.Slice(responseBuilders, func(i, j int) bool {
+		return bytes.Compare(responseBuilders[i].Builder.PublicKey[:], responseBuilders[j].Builder.PublicKey[:]) < 0
+	})
+
+	if len(responseBuilders) != 2 {
+		t.Fatalf("Expected 2 builders, got %d", len(responseBuilders))
+	}
+
+	if len(responseBuilders[0].PendingPayments) != 1 {
+		t.Fatalf("Expected 1 pending payment, got %d", len(responseBuilders[0].PendingPayments))
+	}
+
+	if len(responseBuilders[0].PendingWithdrawals) != 1 {
+		t.Fatalf("Expected 1 pending withdrawal, got %d", len(responseBuilders[0].PendingWithdrawals))
+	}
+
+	if len(responseBuilders[1].PendingPayments) != 1 {
+		t.Fatalf("Expected 1 pending payment, got %d", len(responseBuilders[1].PendingPayments))
+	}
+
+	if len(responseBuilders[1].PendingWithdrawals) != 0 {
+		t.Fatalf("Expected 0 pending withdrawals, got %d", len(responseBuilders[1].PendingWithdrawals))
+	}
+}
+
+func TestAddressHandler(t *testing.T) {
+	svc := Service{
+		Context:  t.Context(),
+		Logger:   newTestLogger(t),
+		Beacon:   testMockBeacon,
+		Listener: httptest.NewUnstartedServer(nil).Listener,
+		Port:     0,
+	}
+
+	go func() {
+		if err := svc.Run(); err != nil {
+			panic(err)
+		}
+	}()
+
+	resp, err := http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/address/0x3333333333333333333333333333333333333333")
+	if err != nil {
+		t.Fatalf("Failed to get address: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Expected status NotFound, got %d", resp.StatusCode)
+	}
+
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/address/" + validExecutionAddress)
+	if err != nil {
+		t.Fatalf("Failed to get address: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	var response struct {
+		Builders   beacon.BuilderSummaries   `json:"builders"`
+		Validators beacon.ValidatorSummaries `json:"validators"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		t.Fatalf("Failed to decode address response: %v", err)
+	}
+
+	if len(response.Builders) != 2 {
+		t.Fatalf("Expected 2 builders, got %d", len(response.Builders))
+	}
+	if len(response.Validators) != 2 {
+		t.Fatalf("Expected 2 validators, got %d", len(response.Validators))
 	}
 }
 

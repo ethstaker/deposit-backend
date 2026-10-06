@@ -7,6 +7,7 @@ import (
 	"github.com/EthStaker/deposit-backend/beacon"
 	apiv1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/spec/electra"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -17,6 +18,9 @@ type MockBeacon struct {
 	PendingConsolidations     []*electra.PendingConsolidation
 	PendingDeposits           []*electra.PendingDeposit
 	PendingPartialWithdrawals []*electra.PendingPartialWithdrawal
+	MockBuilders              map[phase0.BLSPubKey]*beacon.BuilderResponse
+	BuilderPendingPayments    []*gloas.BuilderPendingPayment
+	BuilderPendingWithdrawals []*gloas.BuilderPendingWithdrawal
 }
 
 var _ beacon.BeaconProvider = (*MockBeacon)(nil)
@@ -60,4 +64,35 @@ func (m *MockBeacon) Validators(ctx context.Context, executionAddress common.Add
 		}
 	}
 	return out, nil
+}
+
+func (m *MockBeacon) Builders(ctx context.Context, executionAddress common.Address) (beacon.BuilderSummaries, error) {
+	out := make(beacon.BuilderSummaries, 0)
+	for _, builder := range m.MockBuilders {
+		if bytes.Equal(builder.Builder.ExecutionAddress[:], executionAddress[:]) {
+			builderSummary := beacon.BuilderSummary{
+				Builder: builder.Builder,
+			}
+			for _, pendingPayment := range m.BuilderPendingPayments {
+				if pendingPayment.Withdrawal.BuilderIndex == builder.Index {
+					builderSummary.PendingPayments = append(builderSummary.PendingPayments, pendingPayment)
+				}
+			}
+			for _, pendingWithdrawal := range m.BuilderPendingWithdrawals {
+				if pendingWithdrawal.BuilderIndex == builder.Index {
+					builderSummary.PendingWithdrawals = append(builderSummary.PendingWithdrawals, pendingWithdrawal)
+				}
+			}
+			out = append(out, builderSummary)
+		}
+	}
+	return out, nil
+}
+
+func (m *MockBeacon) LookupBuilder(ctx context.Context, pubkey phase0.BLSPubKey) (*beacon.BuilderResponse, error) {
+	builder, ok := m.MockBuilders[pubkey]
+	if !ok {
+		return nil, nil
+	}
+	return builder, nil
 }

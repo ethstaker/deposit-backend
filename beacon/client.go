@@ -15,7 +15,9 @@ import (
 	"github.com/attestantio/go-eth2-client/api"
 	apiv1 "github.com/attestantio/go-eth2-client/api/v1"
 	"github.com/attestantio/go-eth2-client/multi"
+	"github.com/attestantio/go-eth2-client/spec"
 	"github.com/attestantio/go-eth2-client/spec/electra"
+	"github.com/attestantio/go-eth2-client/spec/gloas"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/rs/zerolog"
@@ -26,7 +28,9 @@ type cacheRecord struct {
 	slot     phase0.Slot
 	birthday time.Time
 
-	summaries map[common.Address]ValidatorSummaries
+	validatorSummaries map[common.Address]ValidatorSummaries
+	builderSummaries   map[common.Address]BuilderSummaries
+	buildersByPubkey   map[phase0.BLSPubKey]*BuilderSummary
 }
 
 type Client struct {
@@ -96,6 +100,12 @@ func errorIs404(err error) bool {
 	return false
 }
 
+func isActiveBuilder(gloasState *gloas.BeaconState, builder *gloas.Builder) bool {
+
+	return builder.DepositEpoch < gloasState.FinalizedCheckpoint.Epoch &&
+		builder.WithdrawableEpoch == phase0.Epoch(0xffffffffffffffff) // FarFutureEpoch
+}
+
 func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 	if !c.updateMutex.TryLock() {
 		c.logger.Debug("cache update in progress, skipping")
@@ -141,6 +151,7 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 	pendingConsolidations := make(map[phase0.ValidatorIndex][]*electra.PendingConsolidation, 64)
 	pendingDeposits := make(map[phase0.BLSPubKey][]*electra.PendingDeposit, 64)
 	pendingPartialWithdrawals := make(map[phase0.ValidatorIndex][]*electra.PendingPartialWithdrawal, 64)
+	var beaconState *spec.VersionedBeaconState
 	var pendingDepositsList []*electra.PendingDeposit
 
 	group, wgCtx := errgroup.WithContext(ctx)
@@ -205,6 +216,17 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 		}
 		return nil
 	})
+	group.Go(func() error {
+		beaconStateResponse, err := client.BeaconState(wgCtx, &api.BeaconStateOpts{
+			State:  fmt.Sprint(slot),
+			Common: commonOpts,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to get beacon state: %w", err)
+		}
+		beaconState = beaconStateResponse.Data
+		return nil
+	})
 	if err := group.Wait(); err != nil {
 		return fmt.Errorf("failed to update cache: %w", err)
 	}
@@ -215,7 +237,9 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 	cache.slot = slot
 	cache.birthday = time.Now()
 
-	cache.summaries = make(map[common.Address]ValidatorSummaries, len(validators))
+	cache.validatorSummaries = make(map[common.Address]ValidatorSummaries, len(validators))
+	cache.builderSummaries = make(map[common.Address]BuilderSummaries)
+	cache.buildersByPubkey = make(map[phase0.BLSPubKey]*BuilderSummary)
 
 	for _, validator := range validators {
 		if bytes.HasPrefix(validator.Validator.WithdrawalCredentials, []byte{0x00}) {
@@ -232,7 +256,44 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 			PendingPartialWithdrawals: pendingPartialWithdrawals[validator.Index],
 		}
 
-		cache.summaries[withdrawalAddress] = append(cache.summaries[withdrawalAddress], summary)
+		cache.validatorSummaries[withdrawalAddress] = append(cache.validatorSummaries[withdrawalAddress], summary)
+	}
+
+	if beaconState.Version == spec.DataVersionGloas {
+		gloasState := beaconState.Gloas
+		// keep a temporary map from builder index to the map entries
+		builderMap := make(map[gloas.BuilderIndex]*BuilderSummary)
+		builders := gloasState.Builders
+		builderPendingPayments := gloasState.BuilderPendingPayments
+		builderPendingWithdrawals := gloasState.BuilderPendingWithdrawals
+
+		withdrawalAddress := common.BytesToAddress(builders[0].ExecutionAddress[:])
+		for index, builder := range builders {
+			summary := BuilderSummary{
+				Builder: builder,
+				status:  "pending",
+				index:   gloas.BuilderIndex(index),
+			}
+			cache.builderSummaries[withdrawalAddress] = append(cache.builderSummaries[withdrawalAddress], summary)
+			builderMap[gloas.BuilderIndex(index)] = &summary
+			if isActiveBuilder(gloasState, builder) {
+				summary.status = "active"
+			}
+			if builder.WithdrawableEpoch != phase0.Epoch(0xffffffffffffffff) {
+				summary.status = "exited"
+			}
+			cache.buildersByPubkey[builder.PublicKey] = &summary
+		}
+		for _, pendingPayment := range builderPendingPayments {
+			if builder, ok := builderMap[pendingPayment.Withdrawal.BuilderIndex]; ok {
+				builder.PendingPayments = append(builder.PendingPayments, pendingPayment)
+			}
+		}
+		for _, pendingWithdrawal := range builderPendingWithdrawals {
+			if builder, ok := builderMap[pendingWithdrawal.BuilderIndex]; ok {
+				builder.PendingWithdrawals = append(builder.PendingWithdrawals, pendingWithdrawal)
+			}
+		}
 	}
 
 	// We aren't done yet- we want to check if any pending deposits are for validators
@@ -254,7 +315,7 @@ func addMissingValidatorDeposits(pendingDepositsList []*electra.PendingDeposit, 
 	depositsMissingFromState := make(map[phase0.BLSPubKey]ValidatorSummary)
 	for _, deposit := range pendingDepositsList {
 		withdrawalAddress := common.BytesToAddress(deposit.WithdrawalCredentials[12:])
-		if _, ok := cache.summaries[withdrawalAddress]; !ok {
+		if _, ok := cache.validatorSummaries[withdrawalAddress]; !ok {
 			summary, exists := depositsMissingFromState[deposit.Pubkey]
 			if exists {
 				summary.PendingDeposits = append(summary.PendingDeposits, deposit)
@@ -281,7 +342,7 @@ func addMissingValidatorDeposits(pendingDepositsList []*electra.PendingDeposit, 
 		if bytes.HasPrefix(summary.Validator.Validator.WithdrawalCredentials, []byte{0x00}) {
 			continue
 		}
-		cache.summaries[withdrawalAddress] = append(cache.summaries[withdrawalAddress], summary)
+		cache.validatorSummaries[withdrawalAddress] = append(cache.validatorSummaries[withdrawalAddress], summary)
 	}
 }
 
@@ -290,7 +351,10 @@ func (c *Client) handleHeadEvent(ctx context.Context, head *apiv1.HeadEvent) {
 	if c.refreshInterval > 0 && uint64(head.Slot)%c.refreshInterval != 0 {
 		return
 	}
-	c.updateCache(ctx, head.Slot)
+	err := c.updateCache(ctx, head.Slot)
+	if err != nil {
+		c.logger.Error("failed to update cache", "error", err)
+	}
 }
 
 func (c *Client) Stop() {
@@ -350,5 +414,31 @@ func (c *Client) Validators(ctx context.Context, executionAddress common.Address
 	if cache == nil {
 		return nil, fmt.Errorf("cache not initialized")
 	}
-	return cache.summaries[executionAddress], nil
+	return cache.validatorSummaries[executionAddress], nil
+}
+
+// TODO: once attestant client supports non-state based routes, replace this
+func (c *Client) LookupBuilder(ctx context.Context, pubkey phase0.BLSPubKey) (*BuilderResponse, error) {
+	cache := c.cache.Load()
+	if cache == nil {
+		return nil, fmt.Errorf("cache not initialized")
+	}
+	builder, ok := cache.buildersByPubkey[pubkey]
+	if !ok {
+		return nil, nil
+	}
+	out := BuilderResponse{
+		Builder: builder.Builder,
+		Index:   builder.index,
+		Status:  builder.status,
+	}
+	return &out, nil
+}
+
+func (c *Client) Builders(ctx context.Context, executionAddress common.Address) (BuilderSummaries, error) {
+	cache := c.cache.Load()
+	if cache == nil {
+		return nil, fmt.Errorf("cache not initialized")
+	}
+	return cache.builderSummaries[executionAddress], nil
 }
