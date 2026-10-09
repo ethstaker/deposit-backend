@@ -47,16 +47,22 @@ type Client struct {
 
 var _ BeaconProvider = (*Client)(nil)
 
-func NewClient(ctx context.Context, logger *slog.Logger, level zerolog.Level, beaconUrls []string, refreshInterval uint64) (*Client, error) {
+func NewClient(ctx context.Context, logger *slog.Logger, level zerolog.Level, beaconUrls []string, apiKey string, refreshInterval uint64) (*Client, error) {
 	out := new(Client)
 	out.refreshInterval = refreshInterval
 
 	logger.Debug("connecting to beacon node", "urls", beaconUrls)
 	ctx, cancel := context.WithCancel(ctx)
-	client, err := multi.New(ctx,
+	params := []multi.Parameter{
 		multi.WithAddresses(beaconUrls),
 		multi.WithLogLevel(level),
-	)
+	}
+	if apiKey != "" {
+		params = append(params, multi.WithExtraHeaders(map[string]string{
+			"X-API-Key": apiKey,
+		}))
+	}
+	client, err := multi.New(ctx, params...)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create beacon client: %w", err)
