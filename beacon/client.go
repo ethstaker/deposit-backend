@@ -267,22 +267,20 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 		builderPendingPayments := gloasState.BuilderPendingPayments
 		builderPendingWithdrawals := gloasState.BuilderPendingWithdrawals
 
-		withdrawalAddress := common.BytesToAddress(builders[0].ExecutionAddress[:])
 		for index, builder := range builders {
-			summary := BuilderSummary{
+			summary := &BuilderSummary{
 				Builder: builder,
 				status:  "pending",
 				index:   gloas.BuilderIndex(index),
 			}
-			cache.builderSummaries[withdrawalAddress] = append(cache.builderSummaries[withdrawalAddress], summary)
-			builderMap[gloas.BuilderIndex(index)] = &summary
 			if isActiveBuilder(gloasState, builder) {
 				summary.status = "active"
 			}
 			if builder.WithdrawableEpoch != phase0.Epoch(0xffffffffffffffff) {
 				summary.status = "exited"
 			}
-			cache.buildersByPubkey[builder.PublicKey] = &summary
+			builderMap[gloas.BuilderIndex(index)] = summary
+			cache.buildersByPubkey[builder.PublicKey] = summary
 		}
 		for _, pendingPayment := range builderPendingPayments {
 			if builder, ok := builderMap[pendingPayment.Withdrawal.BuilderIndex]; ok {
@@ -293,6 +291,10 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 			if builder, ok := builderMap[pendingWithdrawal.BuilderIndex]; ok {
 				builder.PendingWithdrawals = append(builder.PendingWithdrawals, pendingWithdrawal)
 			}
+		}
+		for _, summary := range builderMap {
+			withdrawalAddress := common.BytesToAddress(summary.Builder.ExecutionAddress[:])
+			cache.builderSummaries[withdrawalAddress] = append(cache.builderSummaries[withdrawalAddress], *summary)
 		}
 	}
 
