@@ -280,7 +280,8 @@ func TestValidatorHandler(t *testing.T) {
 	}
 
 	// The validator should be found
-	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/validator/" + validPubkey)
+	path := "/api/v1/validator/" + validPubkey
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + path)
 	if err != nil {
 		t.Fatalf("Failed to get validator: %v", err)
 	}
@@ -290,9 +291,12 @@ func TestValidatorHandler(t *testing.T) {
 		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
 	}
 
+	body := readBody(t, resp)
+	assertOpenAPIResponse(t, http.MethodGet, path, resp.StatusCode, body)
+
 	// Make sure it can be parsed by attestantio's go-eth2-client
 	var validator apiv1.Validator
-	if err := json.NewDecoder(resp.Body).Decode(&validator); err != nil {
+	if err := json.Unmarshal(body, &validator); err != nil {
 		t.Fatalf("Failed to decode validator: %v", err)
 	}
 	t.Logf("Round-tripped validator: %+v", validator)
@@ -408,15 +412,23 @@ func TestValidatorsHandler(t *testing.T) {
 	}
 
 	// Query the validators by the execution address
-	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/validators/" + validExecutionAddress)
+	path := "/api/v1/validators/" + validExecutionAddress
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + path)
 	if err != nil {
 		t.Fatalf("Failed to get validators: %v", err)
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
+	}
+
+	body := readBody(t, resp)
+	assertOpenAPIResponse(t, http.MethodGet, path, resp.StatusCode, body)
+
 	// Parse the response
 	var responseValidators beacon.ValidatorSummaries
-	if err := json.NewDecoder(resp.Body).Decode(&responseValidators); err != nil {
+	if err := json.Unmarshal(body, &responseValidators); err != nil {
 		t.Fatalf("Failed to decode validators: %v", err)
 	}
 
@@ -558,7 +570,8 @@ func TestBuilderHandler(t *testing.T) {
 		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
 	}
 
-	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builder/" + validPubkey)
+	path := "/api/v1/builder/" + validPubkey
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + path)
 	if err != nil {
 		t.Fatalf("Failed to get builder: %v", err)
 	}
@@ -568,8 +581,11 @@ func TestBuilderHandler(t *testing.T) {
 		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
 	}
 
+	body := readBody(t, resp)
+	assertOpenAPIResponse(t, http.MethodGet, path, resp.StatusCode, body)
+
 	var builder beacon.BuilderResponse
-	if err := json.NewDecoder(resp.Body).Decode(&builder); err != nil {
+	if err := json.Unmarshal(body, &builder); err != nil {
 		t.Fatalf("Failed to decode builder: %v", err)
 	}
 
@@ -683,7 +699,8 @@ func TestBuildersHandler(t *testing.T) {
 		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
 	}
 
-	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/builders/" + validExecutionAddress)
+	path := "/api/v1/builders/" + validExecutionAddress
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + path)
 	if err != nil {
 		t.Fatalf("Failed to get builders: %v", err)
 	}
@@ -693,13 +710,16 @@ func TestBuildersHandler(t *testing.T) {
 		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
 	}
 
+	body := readBody(t, resp)
+	assertOpenAPIResponse(t, http.MethodGet, path, resp.StatusCode, body)
+
 	var responseBuilders beacon.BuilderSummaries
-	if err := json.NewDecoder(resp.Body).Decode(&responseBuilders); err != nil {
+	if err := json.Unmarshal(body, &responseBuilders); err != nil {
 		t.Fatalf("Failed to decode builders: %v", err)
 	}
 
 	sort.Slice(responseBuilders, func(i, j int) bool {
-		return bytes.Compare(responseBuilders[i].Builder.PublicKey[:], responseBuilders[j].Builder.PublicKey[:]) < 0
+		return bytes.Compare(responseBuilders[i].Builder.Builder.PublicKey[:], responseBuilders[j].Builder.Builder.PublicKey[:]) < 0
 	})
 
 	if len(responseBuilders) != 2 {
@@ -748,7 +768,8 @@ func TestAddressHandler(t *testing.T) {
 		t.Fatalf("Expected status NotFound, got %d", resp.StatusCode)
 	}
 
-	resp, err = http.Get("http://" + svc.Listener.Addr().String() + "/api/v1/address/" + validExecutionAddress)
+	path := "/api/v1/address/" + validExecutionAddress
+	resp, err = http.Get("http://" + svc.Listener.Addr().String() + path)
 	if err != nil {
 		t.Fatalf("Failed to get address: %v", err)
 	}
@@ -758,11 +779,14 @@ func TestAddressHandler(t *testing.T) {
 		t.Fatalf("Expected status OK, got %d", resp.StatusCode)
 	}
 
+	body := readBody(t, resp)
+	assertOpenAPIResponse(t, http.MethodGet, path, resp.StatusCode, body)
+
 	var response struct {
 		Builders   beacon.BuilderSummaries   `json:"builders"`
 		Validators beacon.ValidatorSummaries `json:"validators"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	if err := json.Unmarshal(body, &response); err != nil {
 		t.Fatalf("Failed to decode address response: %v", err)
 	}
 

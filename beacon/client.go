@@ -274,16 +274,19 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 		builderPendingWithdrawals := gloasState.BuilderPendingWithdrawals
 
 		for index, builder := range builders {
-			summary := &BuilderSummary{
+			response := &BuilderResponse{
+				Index:   gloas.BuilderIndex(index),
+				Status:  "pending",
 				Builder: builder,
-				status:  "pending",
-				index:   gloas.BuilderIndex(index),
 			}
 			if isActiveBuilder(gloasState, builder) {
-				summary.status = "active"
+				response.Status = "active"
 			}
 			if builder.WithdrawableEpoch != phase0.Epoch(0xffffffffffffffff) {
-				summary.status = "exited"
+				response.Status = "exited"
+			}
+			summary := &BuilderSummary{
+				Builder: response,
 			}
 			builderMap[gloas.BuilderIndex(index)] = summary
 			cache.buildersByPubkey[builder.PublicKey] = summary
@@ -299,7 +302,7 @@ func (c *Client) updateCache(ctx context.Context, slot phase0.Slot) error {
 			}
 		}
 		for _, summary := range builderMap {
-			withdrawalAddress := common.BytesToAddress(summary.Builder.ExecutionAddress[:])
+			withdrawalAddress := common.BytesToAddress(summary.Builder.Builder.ExecutionAddress[:])
 			cache.builderSummaries[withdrawalAddress] = append(cache.builderSummaries[withdrawalAddress], *summary)
 		}
 	}
@@ -435,12 +438,7 @@ func (c *Client) LookupBuilder(ctx context.Context, pubkey phase0.BLSPubKey) (*B
 	if !ok {
 		return nil, nil
 	}
-	out := BuilderResponse{
-		Builder: builder.Builder,
-		Index:   builder.index,
-		Status:  builder.status,
-	}
-	return &out, nil
+	return builder.Builder, nil
 }
 
 func (c *Client) Builders(ctx context.Context, executionAddress common.Address) (BuilderSummaries, error) {

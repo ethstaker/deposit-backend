@@ -39,9 +39,7 @@ type ValidatorSummary struct {
 type ValidatorSummaries []ValidatorSummary
 
 type BuilderSummary struct {
-	index              gloas.BuilderIndex                `json:"-"`
-	status             string                            `json:"-"`
-	Builder            *gloas.Builder                    `json:"builder"`
+	Builder            *BuilderResponse                  `json:"builder"`
 	PendingPayments    []*gloas.BuilderPendingPayment    `json:"pending_payments,omitempty"`
 	PendingWithdrawals []*gloas.BuilderPendingWithdrawal `json:"pending_withdrawals,omitempty"`
 }

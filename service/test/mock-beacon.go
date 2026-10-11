@@ -71,7 +71,7 @@ func (m *MockBeacon) Builders(ctx context.Context, executionAddress common.Addre
 	for _, builder := range m.MockBuilders {
 		if bytes.Equal(builder.Builder.ExecutionAddress[:], executionAddress[:]) {
 			builderSummary := beacon.BuilderSummary{
-				Builder: builder.Builder,
+				Builder: builder,
 			}
 			for _, pendingPayment := range m.BuilderPendingPayments {
 				if pendingPayment.Withdrawal.BuilderIndex == builder.Index {
