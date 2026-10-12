@@ -7,6 +7,8 @@ It simply provides the frontend with beacon chain data and withdrawal_address->v
 # Usage
 ```
 Usage of ./deposit-backend:
+  -api-key string
+        The X-API-Key to send to the beacon node
   -beacon-url value
         The beacon URL to use. May be repeated.
   -host string

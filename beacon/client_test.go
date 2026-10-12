@@ -34,13 +34,13 @@ func TestAddMissingValidatorDeposits_SingleDeposit(t *testing.T) {
 	}
 
 	cache := &cacheRecord{
-		summaries: make(map[common.Address]ValidatorSummaries),
+		validatorSummaries: make(map[common.Address]ValidatorSummaries),
 	}
 
 	addMissingValidatorDeposits([]*electra.PendingDeposit{deposit}, cache)
 
 	executionAddress := common.BytesToAddress(executionAddressBytes)
-	summaries, ok := cache.summaries[executionAddress]
+	summaries, ok := cache.validatorSummaries[executionAddress]
 	if !ok {
 		t.Fatalf("Expected summary to be added to cache")
 	}
@@ -108,13 +108,13 @@ func TestAddMissingValidatorDeposits_MultipleDepositsSamePubkey(t *testing.T) {
 	}
 
 	cache := &cacheRecord{
-		summaries: make(map[common.Address]ValidatorSummaries),
+		validatorSummaries: make(map[common.Address]ValidatorSummaries),
 	}
 
 	addMissingValidatorDeposits(deposits, cache)
 
 	executionAddress := common.BytesToAddress(executionAddressBytes)
-	summaries, ok := cache.summaries[executionAddress]
+	summaries, ok := cache.validatorSummaries[executionAddress]
 	if !ok {
 		t.Fatalf("Expected summary to be added to cache")
 	}
@@ -189,7 +189,7 @@ func TestAddMissingValidatorDeposits_MultipleDepositsDifferentPubkeys(t *testing
 	}
 
 	cache := &cacheRecord{
-		summaries: make(map[common.Address]ValidatorSummaries),
+		validatorSummaries: make(map[common.Address]ValidatorSummaries),
 	}
 
 	addMissingValidatorDeposits(deposits, cache)
@@ -197,12 +197,12 @@ func TestAddMissingValidatorDeposits_MultipleDepositsDifferentPubkeys(t *testing
 	executionAddress1 := common.BytesToAddress(executionAddress1Bytes)
 	executionAddress2 := common.BytesToAddress(executionAddress2Bytes)
 
-	summaries1, ok1 := cache.summaries[executionAddress1]
+	summaries1, ok1 := cache.validatorSummaries[executionAddress1]
 	if !ok1 {
 		t.Fatalf("Expected summary 1 to be added to cache")
 	}
 
-	summaries2, ok2 := cache.summaries[executionAddress2]
+	summaries2, ok2 := cache.validatorSummaries[executionAddress2]
 	if !ok2 {
 		t.Fatalf("Expected summary 2 to be added to cache")
 	}
@@ -253,7 +253,7 @@ func TestAddMissingValidatorDeposits_IgnoresExistingValidators(t *testing.T) {
 	}
 
 	cache := &cacheRecord{
-		summaries: map[common.Address]ValidatorSummaries{
+		validatorSummaries: map[common.Address]ValidatorSummaries{
 			executionAddress: {existingSummary},
 		},
 	}
@@ -266,7 +266,7 @@ func TestAddMissingValidatorDeposits_IgnoresExistingValidators(t *testing.T) {
 	addMissingValidatorDeposits([]*electra.PendingDeposit{deposit}, cache)
 
 	// Verify the cache still has only the original summary
-	summaries, ok := cache.summaries[executionAddress]
+	summaries, ok := cache.validatorSummaries[executionAddress]
 	if !ok {
 		t.Fatalf("Expected existing summary to remain in cache")
 	}
@@ -325,7 +325,7 @@ func TestAddMissingValidatorDeposits_MixedExistingAndMissing(t *testing.T) {
 	}
 
 	cache := &cacheRecord{
-		summaries: map[common.Address]ValidatorSummaries{
+		validatorSummaries: map[common.Address]ValidatorSummaries{
 			existingExecutionAddress: {existingSummary},
 		},
 	}
@@ -344,7 +344,7 @@ func TestAddMissingValidatorDeposits_MixedExistingAndMissing(t *testing.T) {
 	addMissingValidatorDeposits(deposits, cache)
 
 	// Verify existing validator is unchanged
-	existingSummaries, ok := cache.summaries[existingExecutionAddress]
+	existingSummaries, ok := cache.validatorSummaries[existingExecutionAddress]
 	if !ok {
 		t.Fatalf("Expected existing summary to remain in cache")
 	}
@@ -357,7 +357,7 @@ func TestAddMissingValidatorDeposits_MixedExistingAndMissing(t *testing.T) {
 
 	// Verify missing validator was added
 	missingExecutionAddress := common.BytesToAddress(missingExecutionAddressBytes)
-	missingSummaries, ok := cache.summaries[missingExecutionAddress]
+	missingSummaries, ok := cache.validatorSummaries[missingExecutionAddress]
 	if !ok {
 		t.Fatalf("Expected missing summary to be added to cache")
 	}
@@ -413,21 +413,21 @@ func TestAddMissingValidatorDeposits_Ignores0x00PrefixedDeposits(t *testing.T) {
 	}
 
 	cache := &cacheRecord{
-		summaries: make(map[common.Address]ValidatorSummaries),
+		validatorSummaries: make(map[common.Address]ValidatorSummaries),
 	}
 
 	addMissingValidatorDeposits(deposits, cache)
 
 	// Verify that nothing was added to the cache because the first deposit has 0x00 prefix
 	executionAddress := common.BytesToAddress(executionAddressBytes)
-	summaries, ok := cache.summaries[executionAddress]
+	summaries, ok := cache.validatorSummaries[executionAddress]
 	if ok {
 		t.Fatalf("Expected no summary to be added to cache (0x00 prefix should be ignored), but got %d summaries", len(summaries))
 	}
 
 	// Verify the cache is empty
-	if len(cache.summaries) != 0 {
-		t.Fatalf("Expected empty cache, got %d entries", len(cache.summaries))
+	if len(cache.validatorSummaries) != 0 {
+		t.Fatalf("Expected empty cache, got %d entries", len(cache.validatorSummaries))
 	}
 }
 
@@ -475,21 +475,21 @@ func TestAddMissingValidatorDeposits_Ignores0x00PrefixedDepositsWithDifferentPub
 	}
 
 	cache := &cacheRecord{
-		summaries: make(map[common.Address]ValidatorSummaries),
+		validatorSummaries: make(map[common.Address]ValidatorSummaries),
 	}
 
 	addMissingValidatorDeposits(deposits, cache)
 
 	// Verify that pubkey1 (0x00 prefix) was not added
 	executionAddress1 := common.BytesToAddress(executionAddress1Bytes)
-	_, ok1 := cache.summaries[executionAddress1]
+	_, ok1 := cache.validatorSummaries[executionAddress1]
 	if ok1 {
 		t.Fatalf("Expected pubkey1 summary to be ignored (0x00 prefix), but it was added")
 	}
 
 	// Verify that pubkey2 (0x02 prefix) was added
 	executionAddress2 := common.BytesToAddress(executionAddress2Bytes)
-	summaries2, ok2 := cache.summaries[executionAddress2]
+	summaries2, ok2 := cache.validatorSummaries[executionAddress2]
 	if !ok2 {
 		t.Fatalf("Expected pubkey2 summary to be added to cache")
 	}
